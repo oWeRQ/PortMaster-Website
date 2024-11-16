@@ -57,14 +57,92 @@ function createElement(tagName, props, children) {
     return element;
 }
 
-async function batchReplaceChildren(batchSize, container, children) {
+async function batchReplaceChildren1(batchSize, container, children) {
     container.replaceChildren();
     for (const [i, child] of children.entries()) {
-        if ((i + 1) % batchSize === 0) {
-            await new Promise(resolve => setTimeout(resolve));
-        }
+        // if ((i + 1) % batchSize === 0) {
+        //     await new Promise(resolve => requestIdleCallback(resolve));
+        // }
         container.appendChild(child);
     }
+}
+
+async function batchReplaceChildren2(batchSize, container, children) {
+    const chunks = arrayChunks(batchSize, children);
+    const fragment = document.createDocumentFragment();
+    fragment.append(...chunks.shift());
+    container.replaceChildren(fragment);
+    for (const chunk of chunks) {
+        const fragment = document.createDocumentFragment();
+        fragment.append(...chunk);
+        container.append(fragment);
+    }
+}
+
+async function batchReplaceChildren3(batchSize, container, children) {
+    if (prevChildren) {
+        for (const [i, child] of children.entries()) {
+            if (i > 0) {
+                container.insertBefore(child, children[i - 1].nextSibling);
+            } else {
+                container.prepend(child);
+            }
+        }
+    } else {
+        for (const [i, child] of children.entries()) {
+            container.append(child);
+        }
+    }
+
+    prevChildren = children;
+}
+
+async function batchReplaceChildren4(batchSize, container, children) {
+    let last = children.pop();
+    container.append(last);
+    for (let i = children.length - 1; i >= 0; i--) {
+        if (children[i].nextSibling !== last)
+            container.insertBefore(children[i], last);
+        last = children[i];
+    }
+}
+
+async function batchReplaceChildren5(batchSize, container, children) {
+    let last = children[0];
+    container.prepend(last);
+    for (let i =  1; i < children.length; i++) {
+        container.insertBefore(children[i], last.nextSibling);
+        last = children[i];
+    }
+}
+
+async function batchReplaceChildren6(batchSize, container, children) {
+    const fragment = document.createElement('div');
+    for (const [i, child] of children.entries()) {
+        fragment.appendChild(child);
+    }
+    container.innerHTML = fragment.innerHTML;
+}
+
+async function batchReplaceChildren7(batchSize, container, children) {
+    container.replaceChildren(...children);
+}
+
+var prevChildren = null;
+var batchReplaceChildren = (...args) => {
+    batchReplaceChildren1(...args);
+    batchReplaceChildren2(...args);
+    batchReplaceChildren3(...args);
+    batchReplaceChildren4(...args);
+    batchReplaceChildren5(...args);
+    batchReplaceChildren6(...args);
+    batchReplaceChildren7(...args);
+};
+
+function arrayChunks(size, array) {
+    return Array.from({ length: Math.ceil(array.length / size) }, (_, index) => {
+        return array.slice(size * index, size * (index + 1));
+    });
 }
 
 function devided(divider, array) {
@@ -539,7 +617,7 @@ function displayCards(ports, selectedDevices, firmwareNames) {
 
     const cardsContainer = document.getElementById('cards-container');
     batchReplaceChildren(200, cardsContainer, ports.map(port => {
-        return updateCard(getCard(port), port, selectedDevices, firmwareNames)
+        return updateCard(getCard(port), port, selectedDevices, firmwareNames);
     }));
 }
 //#endregion
