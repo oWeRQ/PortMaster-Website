@@ -190,12 +190,15 @@ function getDevicesByManufacturer(devices) {
     const manufacturers = {};
 
     for (const device of Object.values(devices)) {
-        if (manufacturers[device.manufacturer]?.push(device) == null) {
-            manufacturers[device.manufacturer] = [device];
+        if (manufacturers[device.manufacturer]?.devices.push(device) == null) {
+            manufacturers[device.manufacturer] = {
+                name: device.manufacturer,
+                devices: [device],
+            };
         }
     }
 
-    return Object.entries(manufacturers).sort((a, b) => a[0].localeCompare(b[0]));
+    return Object.values(manufacturers).sort((a, b) => a.name.localeCompare(b.name));
 }
 
 function getCardUrl(port, deviceDetails) {
@@ -316,8 +319,9 @@ function createDropdownItem(checkbox, label, count) {
     ]);
 }
 
-function createDropdownCheckbox(name, onchange) {
+function createDropdownCheckbox(refs, name, onchange) {
     return createElement('input', {
+        ref: el => refs[name] = el,
         name,
         className: 'form-check-input',
         type: 'checkbox',
@@ -332,25 +336,27 @@ function createDropdowns({ devices, genres, onchange }) {
         genre: {},
     };
 
-    const attributesGroup = createDropdownGroup('Filters', [
-        createDropdownItem(checkboxes.attribute['readyToRun'] = createDropdownCheckbox('readyToRun', onchange), 'Ready to Run'),
-        createDropdownItem(checkboxes.attribute['filesNeeded'] = createDropdownCheckbox('filesNeeded', onchange), 'Files Needed'),
+    const attributeItems = [
+        createDropdownItem(createDropdownCheckbox(checkboxes.attribute, 'readyToRun', onchange), 'Ready to Run'),
+        createDropdownItem(createDropdownCheckbox(checkboxes.attribute, 'filesNeeded', onchange), 'Files Needed'),
+    ];
+
+    const genreItems = genres.map(genre => {
+        return createDropdownItem(createDropdownCheckbox(checkboxes.genre, genre.name, onchange), ucFirst(genre.name), genre.count);
+    });
+
+    const deviceItems = getDevicesByManufacturer(devices).flatMap(manufacturer => [
+        createDropdownHeader(manufacturer.name),
+        ...manufacturer.devices.map(device => {
+            return createDropdownItem(createDropdownCheckbox(checkboxes.device, device.device, onchange), device.name);
+        }),
     ]);
 
-    const devicesGroup = createDropdownGroup('Devices', getDevicesByManufacturer(devices).flatMap(([manufacturer, manufacturerDevices]) => {
-        return [
-            createDropdownHeader(manufacturer),
-            ...manufacturerDevices.map(device => {
-                return createDropdownItem(checkboxes.device[device.device] = createDropdownCheckbox(device.device, onchange), device.name);
-            }),
-        ];
-    }));
-
-    const genresGroup = createDropdownGroup('Genres', genres.map(genre => {
-        return createDropdownItem(checkboxes.genre[genre.name] = createDropdownCheckbox(genre.name, onchange), ucFirst(genre.name), genre.count);
-    }));
-
-    const dropdownGroups = [attributesGroup, genresGroup, devicesGroup];
+    const dropdownGroups = [
+        createDropdownGroup('Filters', attributeItems),
+        createDropdownGroup('Genres', genreItems),
+        createDropdownGroup('Devices', deviceItems),
+    ];
 
     const dropdownButtons = createElement('div', { className: 'btn-group flex-wrap' }, dropdownGroups);
 
